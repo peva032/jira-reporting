@@ -42,8 +42,8 @@ def pull_data(query):
 
 
 if __name__ == "__main__":
-    """Refresh Jira data for all projects and upload to google drive"""
-    logger.info("Refreshing jira_reporting data for all opacity projects")
+    """Refresh Jira data for all configured projects and stores in db"""
+    logger.info("Refreshing jira_reporting data for all projects")
     from util import PROJECT_QUERIES
     import os
 
