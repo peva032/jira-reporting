@@ -1,0 +1,5 @@
+"qvr_all", "project = QVR AND (Sprint in closedSprints() OR Sprint in openSprints()) ORDER BY created DESC"
+"ops_all", "project = OP AND (Sprint in closedSprints() OR Sprint in openSprints()) ORDER BY created DESC"
+"mar_all", "project = MAR AND (Sprint in closedSprints() OR Sprint in openSprints()) ORDER BY created DESC"
+"pap_all", "project = PAP AND (Sprint in closedSprints() OR Sprint in openSprints()) ORDER BY created DESC"
+"thes_all", "project = THES AND (Sprint in closedSprints() OR Sprint in openSprints()) ORDER BY created DESC"

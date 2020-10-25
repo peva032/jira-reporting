@@ -1,0 +1,11 @@
+# Core
+
+pandas
+jira
+donfig
+loguru
+
+# DB
+
+sqlalchemy
+psycopg2-binary
