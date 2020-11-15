@@ -1,3 +1,4 @@
+import os
 import re
 
 import pandas as pd
@@ -14,9 +15,9 @@ class Report:
 
     @staticmethod
     def get_jira_connection():
-        user = config["USER"]
-        token = config["TOKEN"]
-        server = config["SERVER"]
+        user = config["USER"] or os.environ.get('JIRA_USER', None)
+        token = config["TOKEN"] or os.environ.get('JIRA_TOKEN', None)
+        server = config["SERVER"] or os.environ.get('JIRA_SERVER', None)
         options = {"server": server}
         return JIRA(options=options, basic_auth=(user, token))
 

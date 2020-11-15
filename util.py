@@ -11,9 +11,3 @@ TASK_FIELDS = {
     "updated": None,
     "duedate": None,
 }
-
-PROJECT_QUERIES = {
-    "PROJECT_DESC": {
-        "filter": "JQL_FILTER",
-    },
-}

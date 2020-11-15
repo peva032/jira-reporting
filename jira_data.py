@@ -1,3 +1,6 @@
+import json
+import os
+
 from loguru import logger
 
 from core import Report, list_to_df
@@ -20,8 +23,7 @@ def get_relevant_issue_data(jira_report: Report):
 
 def pull_data(query):
     """Pulls all issues for open and completed sprints"""
-    query_filter = PROJECT_QUERIES[query]["filter"]
-
+    query_name, query_filter = list(query.keys())[0], list(query.values())[0]
     logger.debug(f"Report name: {query_name}")
     logger.debug(f"JQL filter: {query_filter}")
 
@@ -41,14 +43,23 @@ def pull_data(query):
         logger.warning(f"Failed to upload data to db")
 
 
-if __name__ == "__main__":
+def load_filters(file_path: str = 'filters.json') -> dict:
+    with open(file_path, 'r') as f:
+        filters = json.load(f)
+    return dict(filters)
+
+
+def main():
     """Refresh Jira data for all configured projects and stores in db"""
     logger.info("Refreshing jira_reporting data for all projects")
-    from util import PROJECT_QUERIES
-    import os
 
-    # filters_path = os.path.join(os.getcwd(), 'filters.txt')
-    # PROJECT_QUERIES = get_jql_filters(filters_path)
-    for query_name in PROJECT_QUERIES.keys():
+    filters_path = os.path.join(os.getcwd(), 'filters.json')
+    project_queries = load_filters(filters_path)
+    for query_name in project_queries['filters']:
         pull_data(query_name)
     logger.info("Data refresh complete.")
+
+
+if __name__ == '__main__':
+
+    main()
