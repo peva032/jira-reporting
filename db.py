@@ -10,7 +10,6 @@ def db_connection():
     db_user = config.get("DB_USER", None) or os.environ.get('DB_USER', None)
     db_password = config.get("DB_PASSWORD", None) or os.environ.get('DB_PASSWORD', None)
     connection_string = f"postgresql://{db_user}:{db_password}@{endpoint}/postgres"
-    logger.info(f"Connecting to db: {connection_string}")
     return create_engine(connection_string)
 
 
