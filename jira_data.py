@@ -49,7 +49,7 @@ def load_filters(file_path: str = 'filters.json') -> dict:
     return dict(filters)
 
 
-def main():
+def refresh_jira_data():
     """Refresh Jira data for all configured projects and stores in db"""
     logger.info("Refreshing jira_reporting data for all projects")
 
@@ -62,4 +62,5 @@ def main():
 
 if __name__ == '__main__':
 
-    main()
+    refresh_jira_data()
+
