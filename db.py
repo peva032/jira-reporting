@@ -1,3 +1,4 @@
+import os
 import pandas as pd
 from loguru import logger
 from sqlalchemy import create_engine, text
@@ -5,9 +6,9 @@ from core import config
 
 
 def db_connection():
-    endpoint = config["DB_ENDPOINT"]
-    db_user = config["DB_USER"]
-    db_password = config["DB_PASSWORD"]
+    endpoint = config.get("DB_ENDPOINT", None) or os.environ.get('DB_ENDPOINT', None)
+    db_user = config("DB_USER", None) or os.environ.get('DB_USER', None)
+    db_password = config.get("DB_PASSWORD", None) or os.environ.get('DB_PASSWORD', None)
     connection_string = f"postgresql://{db_user}:{db_password}@{endpoint}/postgres"
     return create_engine(connection_string)
 
