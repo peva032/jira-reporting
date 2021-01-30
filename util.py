@@ -10,4 +10,6 @@ TASK_FIELDS = {
     "created": None,
     "updated": None,
     "duedate": None,
+    "timespent": None,
+    "timeestimate": None
 }

@@ -4,6 +4,7 @@ import re
 import pandas as pd
 from donfig import Config
 from jira import JIRA
+import numpy as np
 
 config = Config("jira_reporting")
 
@@ -41,7 +42,7 @@ class Report:
                 if field_name == "resolution":
                     extracted_issue_data[field_name] = 1
                 else:
-                    extracted_issue_data[field_name] = val
+                    extracted_issue_data[field_name] = None if str(val).lower() == 'nan' else val
             except TypeError:
                 if field_name == "resolution":
                     extracted_issue_data[field_name] = 0
