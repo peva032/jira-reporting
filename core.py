@@ -4,7 +4,7 @@ import re
 import pandas as pd
 from donfig import Config
 from jira import JIRA
-import numpy as np
+from loguru import logger
 
 config = Config("jira_reporting")
 
@@ -92,13 +92,16 @@ class Report:
         return pd.DataFrame(sprint_data).sort_values("sprint")
 
 
-def list_to_df(dict_list: list) -> dict:
-    assert dict_list[0], "There is no data in list provided"
-    d = {key: [] for key in dict_list[0].keys()}
-    for row in dict_list:
-        for k, v in row.items():
-            d[k].append(v)
-    return pd.DataFrame(d)
+def list_to_df(dict_list: list) -> pd.DataFrame:
+    if dict_list:
+        d = {key: [] for key in dict_list[0].keys()}
+        for row in dict_list:
+            for k, v in row.items():
+                d[k].append(v)
+        return pd.DataFrame(d)
+    else:
+        logger.warning("No data found for this query")
+        raise Exception("No data found for this query")
 
 
 __all__ = ["Report", "config", "list_to_df"]

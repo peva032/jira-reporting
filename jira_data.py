@@ -31,10 +31,10 @@ def pull_data(query):
     all_issues = jira_report.issues
     logger.info(f"Loaded {len(all_issues)} jira_reporting issues for {query}")
     rows = get_relevant_issue_data(jira_report)
-    jira_data = list_to_df(rows)
-    jira_data = jira_data.rename(columns={"last_sprint": "sprint"})
-    insert_cols = list(jira_data.to_dict().keys())
     try:
+        jira_data = list_to_df(rows)
+        jira_data = jira_data.rename(columns={"last_sprint": "sprint"})
+        insert_cols = list(jira_data.to_dict().keys())
         dataframe_to_db(
             jira_data, table_name="jira_issues", conflicts=["key"], cols=insert_cols
         )

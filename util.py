@@ -11,5 +11,7 @@ TASK_FIELDS = {
     "updated": None,
     "duedate": None,
     "timespent": None,
-    "timeestimate": None
+    "timeestimate": None,
+    "aggregatetimespent": None,
+    "aggregatetimeestimate": None
 }
