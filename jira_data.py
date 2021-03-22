@@ -3,7 +3,7 @@ import os
 
 from loguru import logger
 
-from core import Report, list_to_df
+# from core import Report, list_to_df
 from db import dataframe_to_db
 from util import TASK_FIELDS
 

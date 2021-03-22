@@ -4,6 +4,8 @@ pandas
 jira
 donfig
 loguru
+tqdm
+black
 
 # DB
 

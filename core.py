@@ -1,10 +1,16 @@
 import os
 import re
+from datetime import datetime
 
+import numpy as np
 import pandas as pd
+import pytz
 from donfig import Config
 from jira import JIRA
 from loguru import logger
+
+from db import dataframe_to_db
+from tqdm import tqdm
 
 config = Config("jira_reporting")
 
@@ -16,9 +22,9 @@ class Report:
 
     @staticmethod
     def get_jira_connection():
-        user = config.get("USER", None) or os.environ.get('JIRA_USER', None)
-        token = config.get("TOKEN", None) or os.environ.get('JIRA_TOKEN', None)
-        server = config.get("SERVER", None) or os.environ.get('JIRA_SERVER', None)
+        user = config.get("USER", None) or os.environ.get("JIRA_USER", None)
+        token = config.get("TOKEN", None) or os.environ.get("JIRA_TOKEN", None)
+        server = config.get("SERVER", None) or os.environ.get("JIRA_SERVER", None)
         options = {"server": server}
         return JIRA(options=options, basic_auth=(user, token))
 
@@ -42,7 +48,9 @@ class Report:
                 if field_name == "resolution":
                     extracted_issue_data[field_name] = 1
                 else:
-                    extracted_issue_data[field_name] = None if str(val).lower() == 'nan' else val
+                    extracted_issue_data[field_name] = (
+                        None if str(val).lower() == "nan" else val
+                    )
             except TypeError:
                 if field_name == "resolution":
                     extracted_issue_data[field_name] = 0
@@ -92,6 +100,191 @@ class Report:
         return pd.DataFrame(sprint_data).sort_values("sprint")
 
 
+class ProjectData:
+    def __init__(self, jira_connection: JIRA, project_key: str):
+        self.jira_connection = jira_connection
+        self.project_key = project_key
+        self.issues = self.get_project_issues()
+        self.populated_issues = []
+        self.all_issue_data = []
+        self.all_sprint_data = []
+        self.project_data = pd.DataFrame()
+
+    def get_project_issues(self) -> list:
+        """
+        Makes jira JQL search for project and issues types.
+        Gets latest 100 (maximum)
+        """
+        logger.info(f"Fetching issues for {self.project_key}")
+        query = (
+            f"project={self.project_key} "
+            + f"and issuetype in (Task, Bug, Subtask, Sub-task) "
+            + f"ORDER BY updated DESC"
+        )
+        return self.jira_connection.search_issues(query, maxResults=20)
+
+    def get_issues_from_search_results(self) -> None:
+        """
+         Search results don't contain all data needed,
+        so we need to convert to JIRA.issue objects using
+        the issue ids
+        """
+        logger.info(f"Collecting data for {len(self.issues)} issues")
+        with tqdm(total=len(self.issues)) as pbar:
+            for iss in self.issues:
+                issue_with_data = self.jira_connection.issue(iss.id)
+                # Filter issues that don't have a sprint assigned to them
+                if issue_with_data.fields.customfield_10020:
+                    self.populated_issues.append(issue_with_data)
+                pbar.update(1)
+
+    @staticmethod
+    def get_issue_sprint_data(iss: JIRA.issue) -> list:
+        issue_sprints = iss.fields.customfield_10020
+        return [
+            {
+                'sprint_name': sprint.name,
+                'start_date': sprint.startDate,
+                'end_date': sprint.endDate,
+                'board_id': sprint.boardId,
+                'sprint_state': sprint.state,
+                'sprint_number': float(sprint.name.split(' ')[-1])
+            }
+            for sprint in issue_sprints
+        ]
+
+    @staticmethod
+    def extract_issue_data(iss: JIRA.issue) -> dict:
+        """Extract key issue field data"""
+        return {
+            "key": iss.key,
+            "id": iss.id,
+            "project": iss.fields.project.key,
+            "issue_type": (iss.fields.issuetype.name if iss.fields.issuetype else None),
+            "summary": iss.fields.summary,
+            "assignee": (
+                iss.fields.assignee.displayName if iss.fields.assignee else None
+            ),
+            "reporter": (
+                iss.fields.reporter.displayName if iss.fields.reporter else None
+            ),
+            "priority": (iss.fields.priority.name if iss.fields.priority else None),
+            "status": (iss.fields.status.name if iss.fields.status else None),
+            "resolution": (
+                iss.fields.resolution.name if iss.fields.resolution else None
+            ),
+            "resolved": (
+                1
+                if iss.fields.resolution
+                and iss.fields.resolution.name in ("Done", "DONE")
+                else 0
+            ),
+            "created": iss.fields.created,
+            "updated": iss.fields.updated,
+            "due_date": iss.fields.duedate,
+            "total_time_spent": iss.fields.timespent,
+            "total_time_estimate": iss.fields.timeestimate,
+            "original_time_estimate": iss.fields.timeoriginalestimate,
+            "remaining_time_estimate": (
+                iss.fields.timetracking.remainingEstimateSeconds
+                if iss.fields.timetracking.raw
+                else None
+            ),
+        }
+
+    @staticmethod
+    def get_issue_worklogs(iss: JIRA.issue) -> list:
+        issue_worklogs = iss.fields.worklog.worklogs
+        return [
+            {
+                "time_spent": wl.timeSpentSeconds,
+                "started": wl.started,
+                "updated": wl.updated,
+                "worklog_author": wl.author.displayName,
+            }
+            for wl in issue_worklogs
+        ]
+
+    @staticmethod
+    def worklog_within_sprint(worklog: dict, sprint_data: dict) -> bool:
+        utc = pytz.utc
+        worklog_started = datetime.strptime(
+            worklog.get("started"), "%Y-%m-%dT%H:%M:%S.%f%z"
+        )
+        sprint_start_date = datetime.strptime(
+            sprint_data.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+        ).replace(tzinfo=utc)
+        sprint_end_date = datetime.strptime(
+            sprint_data.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+        ).replace(tzinfo=utc)
+        return sprint_start_date <= worklog_started <= sprint_end_date
+
+    def get_sprint_time_spent(self, iss: JIRA.issue, sprint_data: dict) -> dict:
+        issue_worklogs = self.get_issue_worklogs(iss)
+        sprint_time = 0
+        for worklog in issue_worklogs:
+            if self.worklog_within_sprint(worklog, sprint_data):
+                sprint_time += worklog.get("time_spent", 0)
+        return {"issue_key": iss.key, **sprint_data, "sprint_time_spent": sprint_time}
+
+    def get_issue_sprint_data_with_time_spent(self, iss: JIRA.issue) -> list:
+        issue_sprint_data = self.get_issue_sprint_data(iss)
+        return [self.get_sprint_time_spent(iss, sd) for sd in issue_sprint_data]
+
+    def get_issue_and_sprint_data(self) -> None:
+        issues = self.populated_issues
+        all_issue_level_data = [self.extract_issue_data(_issue) for _issue in issues]
+        all_sprint_level_data = [
+            self.get_issue_sprint_data_with_time_spent(_issue) for _issue in issues
+        ]
+        self.all_issue_data = all_issue_level_data
+        self.all_sprint_data = sum(all_sprint_level_data, [])
+
+    def merge_issue_and_sprint_data(self):
+        issue_df = pd.DataFrame(self.all_issue_data)
+        sprint_df = pd.DataFrame(self.all_sprint_data)
+        project_data = sprint_df.merge(issue_df, left_on="issue_key", right_on="key")
+        project_data.drop("issue_key", inplace=True, axis=1)
+        project_data.rename({"id": "issue_id"}, inplace=True, axis=1)
+        project_data[
+            [
+                "total_time_spent",
+                "total_time_estimate",
+                "original_time_estimate",
+                "remaining_time_estimate",
+            ]
+        ] = (
+            project_data[
+                [
+                    "total_time_spent",
+                    "total_time_estimate",
+                    "original_time_estimate",
+                    "remaining_time_estimate",
+                ]
+            ]
+            .copy()
+            .replace(np.nan, 0)
+        )
+        self.project_data = project_data
+
+    def save_to_db(self):
+        cols = list(self.project_data.columns)
+        conflicts = ('key', 'sprint_name')
+        dataframe_to_db(
+            data=self.project_data,
+            table_name=config.get('DB_TABLE_NAME') or os.environ.get('DB_TABLE_NAME'),
+            conflicts=conflicts,
+            cols=cols
+        )
+
+    def refresh_sprint_data(self):
+        logger.info(f"Refreshing sprint data for {self.project_key}")
+        self.get_issues_from_search_results()
+        self.get_issue_and_sprint_data()
+        self.merge_issue_and_sprint_data()
+        self.save_to_db()
+
+
 def list_to_df(dict_list: list) -> pd.DataFrame:
     if dict_list:
         d = {key: [] for key in dict_list[0].keys()}
@@ -104,4 +297,25 @@ def list_to_df(dict_list: list) -> pd.DataFrame:
         raise Exception("No data found for this query")
 
 
-__all__ = ["Report", "config", "list_to_df"]
+def get_jira_connection():
+    user = config.get("JIRA_USER", None) or os.environ.get("JIRA_USER", None)
+    token = config.get("JIRA_TOKEN", None) or os.environ.get("JIRA_TOKEN", None)
+    server = config.get("JIRA_SERVER", None) or os.environ.get("JIRA_SERVER", None)
+    options = {"server": server}
+    return JIRA(options=options, basic_auth=(user, token))
+
+
+def get_project_keys(jira_connection: JIRA) -> list:
+    projects = jira_connection.projects()
+    logger.info(f"Found {len(projects)} projects for {jira_connection.client_info()}")
+    return [project.key for project in projects]
+
+
+__all__ = [
+    "Report",
+    "config",
+    "list_to_df",
+    "get_project_keys",
+    "ProjectData",
+    "get_jira_connection",
+]

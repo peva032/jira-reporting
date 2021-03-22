@@ -2,7 +2,9 @@ import os
 import pandas as pd
 from loguru import logger
 from sqlalchemy import create_engine, text
-from core import config
+from donfig import Config
+
+config = Config("jira_reporting")
 
 
 def db_connection():
@@ -40,3 +42,13 @@ def dataframe_to_db(data: pd.DataFrame, table_name, conflicts, cols) -> None:
 
 def df_to_rows(data: pd.DataFrame) -> list:
     return [row.to_dict() for _, row in data.iterrows()]
+
+
+__all__ = [
+    "config",
+    "db_connection",
+    "read_data",
+    "write_data",
+    "dataframe_to_db",
+    "df_to_rows",
+]
