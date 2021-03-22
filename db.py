@@ -6,9 +6,9 @@ from core import config
 
 
 def db_connection():
-    endpoint = config.get("DB_ENDPOINT", None) or os.environ.get('DB_ENDPOINT', None)
-    db_user = config.get("DB_USER", None) or os.environ.get('DB_USER', None)
-    db_password = config.get("DB_PASSWORD", None) or os.environ.get('DB_PASSWORD', None)
+    endpoint = config.get("DB_ENDPOINT", None) or os.environ.get("DB_ENDPOINT", None)
+    db_user = config.get("DB_USER", None) or os.environ.get("DB_USER", None)
+    db_password = config.get("DB_PASSWORD", None) or os.environ.get("DB_PASSWORD", None)
     connection_string = f"postgresql://{db_user}:{db_password}@{endpoint}/postgres"
     return create_engine(connection_string)
 
@@ -18,12 +18,7 @@ def read_data(cols):
     return pd.read_sql_query(f'select {", ".join(cols)} from jira_issues', connection)
 
 
-def write_data(
-    data: dict,
-    table_name,
-    conflicts,
-    cols,
-):
+def write_data(data: dict, table_name, conflicts, cols):
     connection = db_connection()
     query = text(
         f"""
@@ -38,6 +33,7 @@ def write_data(
 
 def dataframe_to_db(data: pd.DataFrame, table_name, conflicts, cols) -> None:
     rows = df_to_rows(data)
+    logger.info(f"Uploading {len(rows)} to rows db")
     for row in rows:
         write_data(row, table_name=table_name, conflicts=conflicts, cols=cols)
 
