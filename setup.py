@@ -16,5 +16,6 @@ setup(
         "loguru",
         "sqlalchemy",
         "psycopg2-binary",
+        "tqdm"
     ],
 )
