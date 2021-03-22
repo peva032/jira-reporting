@@ -143,12 +143,12 @@ class ProjectData:
         issue_sprints = iss.fields.customfield_10020
         return [
             {
-                'sprint_name': sprint.name,
-                'start_date': sprint.startDate,
-                'end_date': sprint.endDate,
-                'board_id': sprint.boardId,
-                'sprint_state': sprint.state,
-                'sprint_number': float(sprint.name.split(' ')[-1])
+                "sprint_name": sprint.name,
+                "start_date": sprint.startDate,
+                "end_date": sprint.endDate,
+                "board_id": sprint.boardId,
+                "sprint_state": sprint.state,
+                "sprint_number": float(sprint.name.split(" ")[-1]),
             }
             for sprint in issue_sprints
         ]
@@ -243,17 +243,10 @@ class ProjectData:
     def merge_issue_and_sprint_data(self):
         issue_df = pd.DataFrame(self.all_issue_data)
         sprint_df = pd.DataFrame(self.all_sprint_data)
-        project_data = sprint_df.merge(issue_df, left_on="issue_key", right_on="key")
-        project_data.drop("issue_key", inplace=True, axis=1)
-        project_data.rename({"id": "issue_id"}, inplace=True, axis=1)
-        project_data[
-            [
-                "total_time_spent",
-                "total_time_estimate",
-                "original_time_estimate",
-                "remaining_time_estimate",
-            ]
-        ] = (
+        if len(issue_df) > 0 and len(sprint_df) > 0:
+            project_data = sprint_df.merge(issue_df, left_on="issue_key", right_on="key")
+            project_data.drop("issue_key", inplace=True, axis=1)
+            project_data.rename({"id": "issue_id"}, inplace=True, axis=1)
             project_data[
                 [
                     "total_time_spent",
@@ -261,21 +254,33 @@ class ProjectData:
                     "original_time_estimate",
                     "remaining_time_estimate",
                 ]
-            ]
-            .copy()
-            .replace(np.nan, 0)
-        )
-        self.project_data = project_data
+            ] = (
+                project_data[
+                    [
+                        "total_time_spent",
+                        "total_time_estimate",
+                        "original_time_estimate",
+                        "remaining_time_estimate",
+                    ]
+                ]
+                .copy()
+                .replace(np.nan, 0)
+            )
+            self.project_data = project_data
+
 
     def save_to_db(self):
-        cols = list(self.project_data.columns)
-        conflicts = ('key', 'sprint_name')
-        dataframe_to_db(
-            data=self.project_data,
-            table_name=config.get('DB_TABLE_NAME') or os.environ.get('DB_TABLE_NAME'),
-            conflicts=conflicts,
-            cols=cols
-        )
+        if len(self.project_data) > 0:
+            cols = list(self.project_data.columns)
+            conflicts = ("key", "sprint_name")
+            dataframe_to_db(
+                data=self.project_data,
+                table_name=config.get("DB_TABLE_NAME") or os.environ.get("DB_TABLE_NAME"),
+                conflicts=conflicts,
+                cols=cols,
+            )
+        else:
+            logger.info(f"No new data for {self.project_key}")
 
     def refresh_sprint_data(self):
         logger.info(f"Refreshing sprint data for {self.project_key}")

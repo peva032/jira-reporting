@@ -20,8 +20,7 @@ def read_data(cols):
     return pd.read_sql_query(f'select {", ".join(cols)} from jira_issues', connection)
 
 
-def write_data(data: dict, table_name, conflicts, cols):
-    connection = db_connection()
+def write_data(conn, data, table_name, conflicts, cols):
     query = text(
         f"""
             insert into {table_name} ({", ".join(cols)}) values
@@ -30,14 +29,21 @@ def write_data(data: dict, table_name, conflicts, cols):
             set {', '.join([f"{c} = excluded.{c}" for c in set(cols)-set(conflicts)])};
         """
     )
-    connection.execute(query, data)
+    conn.execute(query, data)
 
 
 def dataframe_to_db(data: pd.DataFrame, table_name, conflicts, cols) -> None:
     rows = df_to_rows(data)
     logger.info(f"Uploading {len(rows)} to rows db")
+    connection = db_connection()
     for row in rows:
-        write_data(row, table_name=table_name, conflicts=conflicts, cols=cols)
+        write_data(
+            conn=connection,
+            data=row,
+            table_name=table_name,
+            conflicts=conflicts,
+            cols=cols,
+        )
 
 
 def df_to_rows(data: pd.DataFrame) -> list:
