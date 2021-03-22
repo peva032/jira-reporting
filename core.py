@@ -275,7 +275,7 @@ class ProjectData:
             conflicts = ("key", "sprint_name")
             dataframe_to_db(
                 data=self.project_data,
-                table_name=config.get("DB_TABLE_NAME") or os.environ.get("DB_TABLE_NAME"),
+                table_name=config.get("DB_TABLE_NAME", None) or os.environ.get("DB_TABLE_NAME"),
                 conflicts=conflicts,
                 cols=cols,
             )
