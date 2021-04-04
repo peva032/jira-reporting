@@ -144,8 +144,8 @@ class ProjectData:
         return [
             {
                 "sprint_name": sprint.name,
-                "start_date": sprint.startDate,
-                "end_date": sprint.endDate,
+                "start_date": sprint.startDate if getattr(sprint, 'startDate', None) else None,
+                "end_date": sprint.endDate if getattr(sprint, 'endDate', None) else None,
                 "board_id": sprint.boardId,
                 "sprint_state": sprint.state,
                 "sprint_number": float(sprint.name.split(" ")[-1]),
@@ -207,17 +207,20 @@ class ProjectData:
 
     @staticmethod
     def worklog_within_sprint(worklog: dict, sprint_data: dict) -> bool:
-        utc = pytz.utc
-        worklog_started = datetime.strptime(
-            worklog.get("started"), "%Y-%m-%dT%H:%M:%S.%f%z"
-        )
-        sprint_start_date = datetime.strptime(
-            sprint_data.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).replace(tzinfo=utc)
-        sprint_end_date = datetime.strptime(
-            sprint_data.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
-        ).replace(tzinfo=utc)
-        return sprint_start_date <= worklog_started <= sprint_end_date
+        try:
+            utc = pytz.utc
+            worklog_started = datetime.strptime(
+                worklog.get("started"), "%Y-%m-%dT%H:%M:%S.%f%z"
+            )
+            sprint_start_date = datetime.strptime(
+                sprint_data.get("start_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+            ).replace(tzinfo=utc)
+            sprint_end_date = datetime.strptime(
+                sprint_data.get("end_date"), "%Y-%m-%dT%H:%M:%S.%fZ"
+            ).replace(tzinfo=utc)
+            return sprint_start_date <= worklog_started <= sprint_end_date
+        except TypeError:
+            return False
 
     def get_sprint_time_spent(self, iss: JIRA.issue, sprint_data: dict) -> dict:
         issue_worklogs = self.get_issue_worklogs(iss)
